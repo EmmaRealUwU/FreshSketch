@@ -253,7 +253,7 @@ int currentSprayDelayms(){
 }
 
 // Function that prints the current menu to the lcd (TODO)
-void PrintMenu(){
+void printMenu(){
   switch (menu){
     case -1:
       lcd.clear();
