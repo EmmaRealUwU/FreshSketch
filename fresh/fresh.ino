@@ -12,6 +12,7 @@ int buttonDelay = 300;
 int menu = 0; // -1 - powered off, 0 - Home screen, 1 - Menu selector 1, 2 - menu selector 2, 3 - menu selector 3, 4 - delay selector
 int buttonLadder = 0;
 unsigned long lastRead = 0;
+const int buttonPin = A5;
 
 bool inUse = true;
 bool number1 = false;
@@ -23,7 +24,7 @@ int sprayDelayShown = -1; // -1 - current delay, 0 - 1000ms, 1 - 10000ms, 2 - 60
 bool poweredOff = false;
 
 int sprayCount = 2400;
-int temp = 21;
+int temp = 0;
 
 const uint8_t lightSensor = 10;
 
@@ -34,13 +35,13 @@ DallasTemperature temperature(&oneWire);
 void setup() {
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
+  temperature.begin();
+  pinMode(lightSensor, INPUT);
   // Print a message to the LCD.
   printMenu();
-  pinMode(A5, INPUT_PULLUP);
+  pinMode(buttonPin, INPUT_PULLUP);
   lastRead = millis();
-
-  pinMode(lightSensor, INPUT);
-  temperature.begin();
+  
 }
 
 void loop() {
@@ -54,7 +55,7 @@ void spray(){
 // Function that will read button ladder input buttonDelay after the last press
 void readButtons(){
   if(millis() - lastRead >= buttonDelay){
-    buttonLadder = analogRead(5);
+    buttonLadder = analogRead(buttonPin);
     switch (isButton(buttonLadder)) {
       case 0:
         //Code for debugging:
@@ -264,9 +265,8 @@ void printMain(){
   lcd.setCursor(13, 0);
 
   temperature.requestTemperatures();
-  float tempC = temperature.getTempCByIndex(0);
-  lcd.print(temp );
-  lcd.print(tempC);
+  temp = temperature.getTempCByIndex(0);
+  lcd.print(temp);
   lcd.print("C");
 
   lcd.setCursor(0,1);
