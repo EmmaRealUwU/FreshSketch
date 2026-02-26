@@ -2,6 +2,7 @@
 #include <LiquidCrystal.h>
 #include <DallasTemperature.h>
 #include <OneWire.h>
+#include <NewPing.h>
 
 // initialize the library by associating any needed LCD interface pin
 // with the arduino pin number it is connected to
@@ -13,11 +14,8 @@ int menu = 0; // -1 - powered off, 0 - Home screen, 1 - Menu selector 1, 2 - men
 int buttonLadder = 0;
 unsigned long lastRead = 0;
 const int buttonPin = A5;
+unsigned long startUse = 0;
 
-bool inUse = true;
-bool number1 = false;
-bool number2 = false;
-bool cleaning = false;
 
 int currentSprayDelay = 3;
 int sprayDelayShown = -1; // -1 - current delay, 0 - 1000ms, 1 - 10000ms, 2 - 60000ms, 3 - 600000
@@ -32,21 +30,30 @@ const uint8_t lightSensor = 10;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature temperature(&oneWire);
 
+const int motionPin = 7;
+unsigned long lastMotion = 0;
+
+NewPing sonar(A3, A4);
+int distance = 0;
+
 void setup() {
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
   temperature.begin();
   pinMode(lightSensor, INPUT);
+  pinMode(motionPin, INPUT);
+
   // Print a message to the LCD.
   printMenu();
   pinMode(buttonPin, INPUT_PULLUP);
   lastRead = millis();
-  
+  lastMotion = millis();
 }
 
 void loop() {
   readButtons();
 
+  //int s = state();
 }
 
 void spray(){
@@ -193,19 +200,63 @@ void buttonPress3() {
 // 1; In Use - Number 1
 // 2; In Use - Number 2
 // 3; In Use - Cleaning
-int state(){
-  if (inUse) {
-    if (number1) {
-      return 1;
+// 4; Not In Use
+int state(int prevState){
+  if (InUse() == false)
+    { 
+      startUse = 0;
+      return 4;
     }
-    else if (number2) {
-      return 2;
-    }
-    else if (cleaning) {
-      return 3;
-    }
-    else return 0;
+  else if (startUse == 0)
+    resetStateValues()
+
+  if (DoorClosed())
+  {
+    //check for pooping and peeing
+    if (satDown)
   }
+  //if the door has not been closed yet, and it has been in use for longer than a minute
+  else if (doorBeenClosed == false && millis() - startUse > 60000)
+  {
+    return 3;
+  }
+  else if (doorBeenClosed == true)
+  {
+    //decide if poopoo or peepee
+  }
+
+  return prevState;
+}
+
+bool doorBeenClosed = false;
+bool satDown = false;
+int toiletPaperUsed = 0;
+
+void resetStateValues()
+{
+  startUse = millis(); 
+  doorBeenClosed = false;
+  satDown = false;
+  toiletPaperUsed = 0;
+}
+
+bool InUse()
+{
+  //if the light is off, we dont need to check for anything else
+  if (LightOn == false)
+
+  //check if there is motion
+  if (digitalRead(motionPin) == HIGH)
+    lastMotion = millis();
+  
+  //if there has been no motion for a few seconds its empty
+  if (millis() - lastMotion < 5000)
+      return false;
+
+  //also check distance??
+
+  else
+    return true;
 }
 
 bool LightOn()
@@ -214,6 +265,21 @@ bool LightOn()
   if (l < 300)
     return false;
   return true;
+}
+
+bool DoorOpen()
+{
+  if (isButton(analogRead(buttonPin)) == 4)
+    {doorBeenClosed = true;
+    return false;}
+  return true;
+}
+
+bool SitDown()
+{
+  if (sonar.ping_cm() < 300)
+    return true;
+  return false
 }
 
 // Function that returns the current spray delay in ms
