@@ -36,6 +36,8 @@ unsigned long lastMotion = 0;
 NewPing sonar(A3, A4);
 int distance = 0;
 
+int currentState = 0;
+
 void setup() {
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
@@ -53,7 +55,9 @@ void setup() {
 void loop() {
   readButtons();
 
-  //int s = state();
+  currentState = state(currentState);
+
+  //go spray on delay based on state
 }
 
 void spray(){
@@ -194,6 +198,9 @@ void buttonPress3() {
   }
 }
 
+bool doorBeenClosed = false;
+bool satDown = false;
+int toiletPaperUsed = 0;
 
 // Function that returns state:
 // 0; In Use - Type Unknown
@@ -208,29 +215,46 @@ int state(int prevState){
       return 4;
     }
   else if (startUse == 0)
-    resetStateValues()
+    resetStateValues();
 
-  if (DoorClosed())
+  bool doorOpen = DoorOpen();
+
+  //door closes and no decision has been made yet
+  //gather the data needed to determine weather they are pooping or peeing
+  if (doorOpen == false && prevState == 0)
   {
+    doorBeenClosed = true;
     //check for pooping and peeing
-    if (satDown)
+    if (SitDown()){
+      satDown == true;
+    }
+
+    if (ToiletPaperTaken())
+    {
+      //adjust values based on timing and lightuse and stuff???
+      toiletPaperUsed += 1;
+    }
   }
-  //if the door has not been closed yet, and it has been in use for longer than a minute
-  else if (doorBeenClosed == false && millis() - startUse > 60000)
+  //if the door has not been closed yet, and the restroom  has been in use for longer than a minute
+  if (doorOpen && doorBeenClosed == false && millis() - startUse > 60000)
   {
     return 3;
   }
-  else if (doorBeenClosed == true)
+
+  //if the door is opened again after it has been closed
+  //decide weather the person has been pooping or peeing
+  if (doorOpen && doorBeenClosed == true)
   {
-    //decide if poopoo or peepee
+    if (satDown == false || toiletPaperUsed <= 4000)
+      return 1;
+    else
+      return 2;
   }
 
   return prevState;
 }
 
-bool doorBeenClosed = false;
-bool satDown = false;
-int toiletPaperUsed = 0;
+
 
 void resetStateValues()
 {
@@ -270,8 +294,7 @@ bool LightOn()
 bool DoorOpen()
 {
   if (isButton(analogRead(buttonPin)) == 4)
-    {doorBeenClosed = true;
-    return false;}
+    {    return false;}
   return true;
 }
 
@@ -279,7 +302,15 @@ bool SitDown()
 {
   if (sonar.ping_cm() < 300)
     return true;
-  return false
+  return false;
+}
+
+bool ToiletPaperTaken()
+{
+  int l = analogRead(lightSensor);
+  if (l < 500)
+    return true;
+  return false;
 }
 
 // Function that returns the current spray delay in ms
