@@ -3,6 +3,7 @@
 #include <DallasTemperature.h>
 #include <OneWire.h>
 #include <NewPing.h>
+#include <EEPROM.h>
 
 // initialize the library by associating any needed LCD interface pin
 // with the arduino pin number it is connected to
@@ -18,17 +19,26 @@ unsigned long startUse = 0;
 
 
 int currentSprayDelay = 3;
+int currentDelayAddress = sizeof(int);
 int sprayDelayShown = -1; // -1 - current delay, 0 - 1000ms, 1 - 10000ms, 2 - 60000ms, 3 - 600000
 bool poweredOff = false;
 
 int sprayCount = 2400;
+int sprayCountAddress = 0;
 int temp = 0;
 
-const uint8_t lightSensor = 10;
+const int lightSensor = A0;
+
+const int blueLED = 9;
+const int greenLED = 10;
+const int redLED = 13;
 
 #define ONE_WIRE_BUS 8
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature temperature(&oneWire);
+
+int spraysExpected = 0;
+unsigned long sprayScheduled = 0;
 
 const int motionPin = 7;
 unsigned long lastMotion = 0;
@@ -39,28 +49,99 @@ int distance = 0;
 int currentState = 0;
 
 void setup() {
+  
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
   temperature.begin();
   pinMode(lightSensor, INPUT);
   pinMode(motionPin, INPUT);
 
-  // Print a message to the LCD.
-  printMenu();
   pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(redLED, OUTPUT);
+  pinMode(greenLED, OUTPUT);
+  pinMode(blueLED, OUTPUT);
   lastRead = millis();
   lastMotion = millis();
+  updateStateRGB();
+
+  //Uncomment these lines **once** so the EEPROM gets set up properly, else it will (sometimes) not function
+  //EEPROM.put(sprayCountAddress, sprayCount);
+  //EEPROM.put(currentDelayAddress, currentSprayDelay);
+  EEPROM.get(sprayCountAddress, sprayCount);
+  EEPROM.get(currentDelayAddress, currentSprayDelay);
+
+
+  // Print a message to the LCD.
+  printMenu();
 }
 
 void loop() {
+
   readButtons();
 
+  int lastState = currentState;
   currentState = state(currentState);
+  if(lastState != currentState) updateStateRGB();
 
   //go spray on delay based on state
+  sprayIfNecessary();
 }
 
 void spray(){
+  //code that does a spray
+  sprayCount -= 1;
+  EEPROM.put(sprayCountAddress, sprayCount);
+}
+
+// 0; In Use - Type Unknown:  CYAN
+// 1; In Use - Number 1:      YELLOW
+// 2; In Use - Number 2:      RED
+// 3; In Use - Cleaning:      BLUE
+// 4; Not In Use:             GREEN
+// if powered off,            LED off
+void updateStateRGB(){
+  if(poweredOff) {
+    digitalWrite(redLED, LOW);
+    digitalWrite(greenLED, LOW);
+    digitalWrite(blueLED, LOW);
+  }
+  else{
+    switch(currentState){
+      case 0:
+        digitalWrite(redLED, LOW);
+        digitalWrite(greenLED, HIGH);
+        digitalWrite(blueLED, HIGH);
+        break;
+      case 1:
+        digitalWrite(redLED, HIGH);
+        digitalWrite(greenLED, HIGH);
+        digitalWrite(blueLED, LOW);
+        break;
+      case 2:
+        digitalWrite(redLED, HIGH);
+        digitalWrite(greenLED, LOW);
+        digitalWrite(blueLED, LOW);
+        break;
+      case 3:
+        digitalWrite(redLED, LOW);
+        digitalWrite(greenLED, LOW);
+        digitalWrite(blueLED, HIGH);
+        break;
+      case 4:
+        digitalWrite(redLED, LOW);
+        digitalWrite(greenLED, HIGH);
+        digitalWrite(blueLED, LOW);
+        break;
+    }
+  }
+}
+
+void sprayIfNecessary(){
+  if((menu == 0) && (spraysExpected > 0) && (millis() - sprayScheduled >= currentSprayDelay)){
+    spray();
+    spraysExpected -= 1;
+    sprayScheduled = millis();
+  }
 }
 
 // Function that will read button ladder input buttonDelay after the last press
@@ -131,16 +212,22 @@ void buttonPress1() {
       break;
     case 2:
       sprayCount = 2400;
+      EEPROM.put(sprayCountAddress, sprayCount);
       menu = 0;
+      sprayScheduled = millis();
       printMenu();
       break;
     case 3:
       menu = 0;
+      sprayScheduled = millis();
       printMenu();
       break;
     case 4:
       //code that changes the delay based on the displayed delay
-      if (sprayDelayShown != -1) currentSprayDelay = sprayDelayShown;
+      if (sprayDelayShown != -1) {
+        currentSprayDelay = sprayDelayShown;
+        EEPROM.put(currentDelayAddress, currentSprayDelay);
+      }
       menu = 1;
       printMenu();
       break;
@@ -156,6 +243,7 @@ void buttonPress2() {
       if (sprayCount > 0){
         spray();
         sprayCount -= 1;
+        EEPROM.put(sprayCountAddress, sprayCount);
         printMenu();
       }
       break;
@@ -189,11 +277,15 @@ void buttonPress3() {
   if (menu == -1){
     poweredOff = false;
     menu = 0;
+    sprayScheduled = millis();
+    currentState = 4;
+    updateStateRGB();
     printMenu();
   }
   else {
     poweredOff = true;
     menu = -1;
+    updateStateRGB();
     printMenu();
   }
 }
