@@ -12,10 +12,13 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 int buttonDelay = 300;
 
 int menu = 0; // -1 - powered off, 0 - Home screen, 1 - Menu selector 1, 2 - menu selector 2, 3 - menu selector 3, 4 - delay selector
-int buttonLadder = 0;
 unsigned long lastRead = 0;
-const int buttonPin = A5;
+const int buttonLadderPin = A5;
 unsigned long startUse = 0;
+const int powerButtonPin = 13;
+
+const int contactSensorPin = A1;
+unsigned long lastContact = 0;
 
 
 int currentSprayDelay = 3;
@@ -27,11 +30,10 @@ int sprayCount = 2400;
 int sprayCountAddress = 0;
 int temp = 0;
 
-const int lightSensor = A0;
-
-const int blueLED = 9;
+const int redLED = 9;
 const int greenLED = 10;
-const int redLED = 13;
+
+const int lightSensor = A0;
 
 #define ONE_WIRE_BUS 8
 OneWire oneWire(ONE_WIRE_BUS);
@@ -56,13 +58,14 @@ void setup() {
   pinMode(lightSensor, INPUT);
   pinMode(motionPin, INPUT);
 
-  pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(buttonLadderPin, INPUT_PULLUP);
+  pinMode(contactSensorPin, INPUT_PULLUP);
   pinMode(redLED, OUTPUT);
   pinMode(greenLED, OUTPUT);
-  pinMode(blueLED, OUTPUT);
+  pinMode(redLED, OUTPUT);
   lastRead = millis();
   lastMotion = millis();
-  updateStateRGB();
+  digitalWrite(greenLED, HIGH);
 
   //Uncomment these lines **once** so the EEPROM gets set up properly, else it will (sometimes) not function
   //EEPROM.put(sprayCountAddress, sprayCount);
@@ -102,35 +105,17 @@ void spray(){
 void updateStateRGB(){
   if(poweredOff) {
     digitalWrite(redLED, LOW);
-    digitalWrite(greenLED, LOW);
-    digitalWrite(blueLED, LOW);
   }
   else{
     switch(currentState){
       case 0:
-        digitalWrite(redLED, LOW);
-        digitalWrite(greenLED, HIGH);
-        digitalWrite(blueLED, HIGH);
-        break;
       case 1:
-        digitalWrite(redLED, HIGH);
-        digitalWrite(greenLED, HIGH);
-        digitalWrite(blueLED, LOW);
-        break;
       case 2:
-        digitalWrite(redLED, HIGH);
-        digitalWrite(greenLED, LOW);
-        digitalWrite(blueLED, LOW);
-        break;
       case 3:
-        digitalWrite(redLED, LOW);
-        digitalWrite(greenLED, LOW);
-        digitalWrite(blueLED, HIGH);
+        digitalWrite(redLED, HIGH);
         break;
       case 4:
         digitalWrite(redLED, LOW);
-        digitalWrite(greenLED, HIGH);
-        digitalWrite(blueLED, LOW);
         break;
     }
   }
@@ -147,7 +132,7 @@ void sprayIfNecessary(){
 // Function that will read button ladder input buttonDelay after the last press
 void readButtons(){
   if(millis() - lastRead >= buttonDelay){
-    buttonLadder = analogRead(buttonPin);
+    int buttonLadder = analogRead(buttonLadderPin);
     switch (isButton(buttonLadder)) {
       case 0:
         //Code for debugging:
@@ -175,7 +160,6 @@ void readButtons(){
     // button 1 =~ 27
     // button 2 =~ 228
     // button 3 =~ 358
-    // button 4 (magnetic contact sensor) =~ 449
   }
 }
 
@@ -189,9 +173,6 @@ int isButton(int x){
   }
   else if (x < 400){
     return 3;
-  }
-  else if (x < 500){
-    return 4;
   }
   else return 0;
 }
@@ -385,7 +366,7 @@ bool LightOn()
 
 bool DoorOpen()
 {
-  if (isButton(analogRead(buttonPin)) == 4)
+  if (digitalRead(contactSensorPin) == LOW)
     {    return false;}
   return true;
 }
