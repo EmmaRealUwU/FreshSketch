@@ -16,6 +16,8 @@ unsigned long lastRead = 0;
 const int buttonLadderPin = A5;
 unsigned long startUse = 0;
 const int powerButtonPin = 13;
+unsigned long lastPowerButtonPress = 0;
+bool powerButtonInterruptAttached = true;
 
 const int contactSensorPin = A1;
 bool doorOpen = true; //we assume that the door is open when the program starts
@@ -66,7 +68,8 @@ void setup() {
   lastMotion = millis();
   digitalWrite(greenLED, HIGH);
 
-  attachInterrupt(contactSensorPin, Door, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(contactSensorPin), Door, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, FALLING);
 
   //Uncomment these lines **once** so the EEPROM gets set up properly, else it will (sometimes) not function
   //EEPROM.put(sprayCountAddress, sprayCount);
@@ -89,6 +92,8 @@ void loop() {
 
   //go spray on delay based on state
   sprayIfNecessary();
+  reattachPowerButtonInterruptIfNecessary();
+  
 }
 
 void spray(){
@@ -97,13 +102,20 @@ void spray(){
   EEPROM.put(sprayCountAddress, sprayCount);
 }
 
+void reattachPowerButtonInterruptIfNecessary() {
+  if((!powerButtonInterruptAttached) && millis() - lastPowerButtonPress > 250) {
+    attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, FALLING);
+    powerButtonInterruptAttached = true;
+  } 
+}
+
 // 0; In Use - Type Unknown:  CYAN
 // 1; In Use - Number 1:      YELLOW
 // 2; In Use - Number 2:      RED
 // 3; In Use - Cleaning:      BLUE
 // 4; Not In Use:             GREEN
 // if powered off,            LED off
-void updateStateRGB(){
+void updateStateRGB() {
   if(poweredOff) {
     digitalWrite(redLED, LOW);
   }
@@ -272,6 +284,12 @@ void buttonPress3() {
   }
 }
 
+void debouncedPowerButton() {
+  buttonPress3();
+  lastPowerButtonPress = millis();
+  detachInterrupt(digitalPinToInterrupt(powerButtonPin));
+  powerButtonInterruptAttached = false;
+}
 
 bool doorBeenClosed = false;
 bool satDown = false;
