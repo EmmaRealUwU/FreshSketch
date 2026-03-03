@@ -17,6 +17,7 @@ unsigned long lastRead = 0;
 const int buttonPin = A5;
 unsigned long startUse = 0;
 
+bool doorOpen = true; //we assume that the door is open when the program starts
 
 int currentSprayDelay = 3;
 int currentDelayAddress = sizeof(int);
@@ -63,6 +64,8 @@ void setup() {
   lastRead = millis();
   lastMotion = millis();
   updateStateRGB();
+
+  //attachInterrupt(magnetPin, doorOpen = !doorOpen, CHANGE);
 
   //Uncomment these lines **once** so the EEPROM gets set up properly, else it will (sometimes) not function
   //EEPROM.put(sprayCountAddress, sprayCount);
@@ -290,6 +293,7 @@ void buttonPress3() {
   }
 }
 
+
 bool doorBeenClosed = false;
 bool satDown = false;
 int toiletPaperUsed = 0;
@@ -301,15 +305,12 @@ int toiletPaperUsed = 0;
 // 3; In Use - Cleaning
 // 4; Not In Use
 int state(int prevState){
-  if (InUse() == false)
-    { 
-      startUse = 0;
-      return 4;
-    }
+  if (InUse() == false){ 
+    startUse = 0;
+    return 4;
+  }
   else if (startUse == 0)
     resetStateValues();
-
-  bool doorOpen = DoorOpen();
 
   //door closes and no decision has been made yet
   //gather the data needed to determine weather they are pooping or peeing
@@ -346,8 +347,6 @@ int state(int prevState){
   return prevState;
 }
 
-
-
 void resetStateValues()
 {
   startUse = millis(); 
@@ -360,6 +359,7 @@ bool InUse()
 {
   //if the light is off, we dont need to check for anything else
   if (LightOn == false)
+    return false;
 
   //check if there is motion
   if (digitalRead(motionPin) == HIGH)
@@ -380,13 +380,6 @@ bool LightOn()
   int l = analogRead(lightSensor);
   if (l < 300)
     return false;
-  return true;
-}
-
-bool DoorOpen()
-{
-  if (isButton(analogRead(buttonPin)) == 4)
-    {    return false;}
   return true;
 }
 
