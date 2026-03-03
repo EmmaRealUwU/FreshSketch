@@ -18,8 +18,6 @@ unsigned long startUse = 0;
 const int powerButtonPin = 13;
 
 const int contactSensorPin = A1;
-unsigned long lastContact = 0;
-
 bool doorOpen = true; //we assume that the door is open when the program starts
 
 int currentSprayDelay = 3;
@@ -68,7 +66,7 @@ void setup() {
   lastMotion = millis();
   digitalWrite(greenLED, HIGH);
 
-  //attachInterrupt(magnetPin, doorOpen = !doorOpen, CHANGE);
+  attachInterrupt(contactSensorPin, doorOpen = !doorOpen, CHANGE);
 
   //Uncomment these lines **once** so the EEPROM gets set up properly, else it will (sometimes) not function
   //EEPROM.put(sprayCountAddress, sprayCount);
