@@ -66,7 +66,7 @@ void setup() {
   lastMotion = millis();
   digitalWrite(greenLED, HIGH);
 
-  attachInterrupt(contactSensorPin, doorOpen = !doorOpen, CHANGE);
+  attachInterrupt(contactSensorPin, Door, CHANGE);
 
   //Uncomment these lines **once** so the EEPROM gets set up properly, else it will (sometimes) not function
   //EEPROM.put(sprayCountAddress, sprayCount);
@@ -285,15 +285,18 @@ int toiletPaperUsed = 0;
 // 4; Not In Use
 int state(int prevState){
   if (InUse() == false){ 
-    startUse = 0;
     return 4;
   }
-  else if (startUse == 0)
+  else if (prevState == 4){//if the use *just* started
     resetStateValues();
+    return 0; //since the loop repeats in less than a second, we dont have to start measuring inmediately
+  }
+  else if (prevState != 0) //if a state has already been decided, just return that state
+    return prevState;
 
   //door closes and no decision has been made yet
   //gather the data needed to determine weather they are pooping or peeing
-  if (doorOpen == false && prevState == 0)
+  if (doorOpen == false)
   {
     doorBeenClosed = true;
     //check for pooping and peeing
@@ -375,6 +378,10 @@ bool ToiletPaperTaken()
   if (l < 500)
     return true;
   return false;
+}
+
+void Door(){
+  doorOpen = !doorOpen;
 }
 
 // Function that returns the current spray delay in ms
