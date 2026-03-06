@@ -15,7 +15,7 @@ int menu = 0; // -1 - powered off, 0 - Home screen, 1 - Menu selector 1, 2 - men
 unsigned long lastRead = 0;
 const int buttonLadderPin = A5;
 unsigned long startUse = 0;
-const int powerButtonPin = 13;
+const int powerButtonPin = A2;
 unsigned long lastPowerButtonPress = 0;
 bool powerButtonInterruptAttached = true;
 
@@ -72,6 +72,7 @@ void setup() {
   // sets up pins for input and output
   pinMode(buttonLadderPin, INPUT_PULLUP);
   pinMode(contactSensorPin, INPUT_PULLUP);
+  pinMode(powerButtonPin, INPUT_PULLUP);
   pinMode(freshenerPin, OUTPUT);
   pinMode(greenLED, OUTPUT);
   pinMode(redLED, OUTPUT);
@@ -86,7 +87,7 @@ void setup() {
 
   // attaches interrupts to contact sensor and power button
   attachInterrupt(digitalPinToInterrupt(contactSensorPin), Door, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, FALLING);
+  attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, RISING);
 
   //Uncomment these lines **once** so the EEPROM gets set up properly, else there is no guarantee that it will function
   //EEPROM.put(sprayCountAddress, sprayCount);
@@ -298,6 +299,7 @@ void buttonPress2() {
 // Function that handles button 3 (powerbutton) being pressed
 void buttonPress3() {
   if (menu == -1){
+    digitalWrite(greenLED, HIGH);
     poweredOff = false;
     menu = 0;
     sprayScheduled = millis();
@@ -306,6 +308,7 @@ void buttonPress3() {
     printMenu();
   }
   else {
+    digitalWrite(greenLED, LOW);
     poweredOff = true;
     menu = -1;
     updateStateRGB();
@@ -501,6 +504,7 @@ void printMenuSelector1(){
   lcd.setCursor(0, 0);
   lcd.print("Dist: ");
   lcd.print(distance);
+  lcd.print("    ");
   //lcd.print("     Delay      ");
 
   lcd.setCursor(0, 1);
@@ -510,7 +514,9 @@ void printMenuSelector1(){
 // Function that prints settings selector 2 to the lcd
 void printMenuSelector2(){
   lcd.setCursor(0, 0);
+  lcd.print("Light: ");
   lcd.print(analogRead(lightSensor));
+  lcd.print("    ");
   //lcd.print("  Spray Count   ");
   
   lcd.setCursor(0, 1);
@@ -520,7 +526,9 @@ void printMenuSelector2(){
 // Function that prints settings selector 3 to the lcd
 void printMenuSelector3(){
   lcd.setCursor(0, 0);
+  lcd.print("Motion: ");
   lcd.print(lastMotion);
+  lcd.print("    ");
   //lcd.print("      Quit      ");
 
   lcd.setCursor(0, 1);
