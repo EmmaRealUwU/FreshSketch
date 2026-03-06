@@ -402,14 +402,13 @@ bool InUse()
       lastMotion = millis();
   }
   
-  //if there has been no motion for a few seconds its empty
-  if (millis() - lastMotion < 5000)
-    return false;
-
+  distance = sonar.ping_cm();
   //also check distance??
+  
+  //if there has been no motion for a few seconds its empty
+  if (millis() - lastMotion < 5000) return false;
 
-  else
-    return true;
+  else return true;
 }
 
 bool LightOn()
@@ -422,7 +421,7 @@ bool LightOn()
 
 bool SitDown()
 {
-  if (sonar.ping_cm() < 150)
+  if  (sonar.ping_cm() < 150)
     return true;
   return false;
 }
