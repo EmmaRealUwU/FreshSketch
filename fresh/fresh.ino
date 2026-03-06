@@ -7,7 +7,7 @@
 
 // initialize the library by associating any needed LCD interface pin
 // with the arduino pin number it is connected to
-const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = A2, d7 = A1;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 int buttonDelay = 300;
 
@@ -15,11 +15,11 @@ int menu = 0; // -1 - powered off, 0 - Home screen, 1 - Menu selector 1, 2 - men
 unsigned long lastRead = 0;
 const int buttonLadderPin = A5;
 unsigned long startUse = 0;
-const int powerButtonPin = A2;
+const int powerButtonPin = 3;
 unsigned long lastPowerButtonPress = 0;
 bool powerButtonInterruptAttached = true;
 
-const int contactSensorPin = A1;
+const int contactSensorPin = 2;
 bool doorOpen = true; //we assume that the door is open when the program starts
 
 int currentSprayDelay = 3;
@@ -101,23 +101,24 @@ void setup() {
 }
 
 void loop() {
+  if(!poweredOff){
+    readButtons();
 
-  readButtons();
+    //if the state changes, the LEDs will reflect this
+    int lastState = currentState;
+    currentState = state(currentState);
+    if(lastState != currentState) updateStateRGB();
 
-  //if the state changes, the LEDs will reflect this
-  int lastState = currentState;
-  currentState = state(currentState);
-  if(lastState != currentState) updateStateRGB();
+    //ensures motion sensor is done calibrating before asking for data
+    if(!motionDoneCalibrating && (millis() - motionStartedCalibrating >= 60000)){
+      motionDoneCalibrating = true;
+    }
 
-  //ensures motion sensor is done calibrating before asking for data
-  if(!motionDoneCalibrating && (millis() - motionStartedCalibrating >= 60000)){
-    motionDoneCalibrating = true;
+    //queues a spray on delay based on state
+    sprayIfNecessary();
+    pollTempIfNecessary();
   }
-
-  //queues a spray on delay based on state
-  sprayIfNecessary();
   reattachPowerButtonInterruptIfNecessary();
-  pollTempIfNecessary();
 }
 
 void spray(){
@@ -134,9 +135,10 @@ void spray(){
 
 //after a delay of 250ms the power button is available for pressing again
 void reattachPowerButtonInterruptIfNecessary() {
-  if((!powerButtonInterruptAttached) && millis() - lastPowerButtonPress > 250) {
-    attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, FALLING);
+  if((!powerButtonInterruptAttached) && (millis() - lastPowerButtonPress > 500)) {
+    attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, RISING);
     powerButtonInterruptAttached = true;
+    lastPowerButtonPress = millis();
   } 
 }
 
