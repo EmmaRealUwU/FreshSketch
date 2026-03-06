@@ -24,12 +24,15 @@ bool doorOpen = true; //we assume that the door is open when the program starts
 
 int currentSprayDelay = 3;
 int currentDelayAddress = sizeof(int);
-int sprayDelayShown = -1; // -1 - current delay, 0 - 1000ms, 1 - 10000ms, 2 - 60000ms, 3 - 600000
+int sprayDelayShown = -1; // -1 - current delay, 0 - 15000ms, 1 - 30000ms, 2 - 60000ms, 3 - 600000
 bool poweredOff = false;
 
+int lastSavedSprayCount = 2400;
 int sprayCount = 2400;
 int sprayCountAddress = 0;
 int temp = 0;
+
+const int freshenerPin = 6;
 
 const int redLED = 9;
 const int greenLED = 10;
@@ -46,6 +49,10 @@ unsigned long sprayScheduled = 0;
 const int motionPin = 7;
 unsigned long lastMotion = 0;
 
+unsigned long freshenerTurntOn = 0;
+unsigned long freshenerTurntOff = 0;
+bool waitingForSpray = false;
+
 NewPing sonar(A3, A4);
 int distance = 0;
 
@@ -61,7 +68,7 @@ void setup() {
 
   pinMode(buttonLadderPin, INPUT_PULLUP);
   pinMode(contactSensorPin, INPUT_PULLUP);
-  pinMode(redLED, OUTPUT);
+  pinMode(freshenerPin, OUTPUT);
   pinMode(greenLED, OUTPUT);
   pinMode(redLED, OUTPUT);
   lastRead = millis();
@@ -76,7 +83,7 @@ void setup() {
   //EEPROM.put(currentDelayAddress, currentSprayDelay);
   EEPROM.get(sprayCountAddress, sprayCount);
   EEPROM.get(currentDelayAddress, currentSprayDelay);
-
+  lastSavedSprayCount = sprayCount;
 
   // Print a message to the LCD.
   printMenu();
@@ -92,14 +99,19 @@ void loop() {
 
   //go spray on delay based on state
   sprayIfNecessary();
-  reattachPowerButtonInterruptIfNecessary();
-  
+  reattachPowerButtonInterruptIfNecessary();  
 }
 
 void spray(){
-  //code that does a spray
-  sprayCount -= 1;
-  EEPROM.put(sprayCountAddress, sprayCount);
+  //save millis() so can be undone after 16000ms
+  if(millis() - freshenerTurntOff >= 1000){
+    freshenerTurntOn = millis()
+    digitalWrite(freshenerPin, HIGH);
+    waitingForSpray = true;
+    spraysExpected -= 1;
+    sprayCount -= 1;
+    sprayScheduled = millis();
+  }
 }
 
 void reattachPowerButtonInterruptIfNecessary() {
@@ -135,10 +147,14 @@ void updateStateRGB() {
 }
 
 void sprayIfNecessary(){
-  if((menu == 0) && (spraysExpected > 0) && (millis() - sprayScheduled >= currentSprayDelay)){
+  if((menu == 0) && (spraysExpected > 0) && (millis() - sprayScheduled + 15000 >= currentSprayDelay())){
     spray();
-    spraysExpected -= 1;
-    sprayScheduled = millis();
+  }
+  if(waitingForSpray && (millis() - freshenerTurntOn >= 16000)){
+    waitingForSpray = false;
+    EEPROM.put(sprayCountAddress, lastSavedSprayCount - 1);
+    digitalWrite(freshenerPin, LOW);
+    freshenerTurntOff = millis();
   }
 }
 
@@ -147,15 +163,6 @@ void readButtons(){
   if(millis() - lastRead >= buttonDelay){
     int buttonLadder = analogRead(buttonLadderPin);
     switch (isButton(buttonLadder)) {
-      case 0:
-        //Code for debugging:
-        //lcd.setCursor(0, 0);
-        //lcd.print("last read: ");
-        //lcd.print(lastRead);
-        //lcd.setCursor(0, 1);
-        //lcd.print("currently: ");
-        //lcd.print(millis());
-        break;
       case 1: 
         buttonPress1();
         lastRead = millis();
@@ -164,15 +171,10 @@ void readButtons(){
         buttonPress2();
         lastRead = millis();
         break;
-      case 3:
-        buttonPress3();
-        lastRead = millis();
-        break;
     }
     // no button =~ 1005
     // button 1 =~ 27
     // button 2 =~ 228
-    // button 3 =~ 358
   }
 }
 
@@ -235,9 +237,7 @@ void buttonPress2() {
       break;
     case 0:
       if (sprayCount > 0){
-        spray();
-        sprayCount -= 1;
-        EEPROM.put(sprayCountAddress, sprayCount);
+        spraysExpected += 1;
         printMenu();
       }
       break;
@@ -339,8 +339,12 @@ int state(int prevState){
   if (doorOpen && doorBeenClosed == true)
   {
     if (satDown == false || toiletPaperUsed <= 4000)
+      sprayScheduled = millis();
+      spraysExpected += 1;
       return 1;
     else
+      sprayScheduled = millis();
+      spraysExpected += 2;
       return 2;
   }
 
@@ -403,17 +407,20 @@ void Door(){
 }
 
 // Function that returns the current spray delay in ms
-int currentSprayDelayms(){
-  switch (currentSprayDelay){
-    default:
+int currentSprayDelay(){
+  switch(currentSprayDelay){
     case 0:
-      return 1000;
+      return 15000;
+      break;
     case 1:
-      return 10000;
+      return 30000;
+      break;
     case 2:
       return 60000;
+      break;
     case 3:
       return 600000;
+      break;
   }
 }
 
@@ -462,7 +469,9 @@ void printMain(){
 // Function that prints settings selector 1 to the lcd
 void printMenuSelector1(){
   lcd.setCursor(0, 0);
-  lcd.print("     Delay      ");
+  lcd.print("Dist: ");
+  lcd.print(distance);
+  //lcd.print("     Delay      ");
 
   lcd.setCursor(0, 1);
   lcd.print("Edit        Next");
@@ -471,7 +480,8 @@ void printMenuSelector1(){
 // Function that prints settings selector 2 to the lcd
 void printMenuSelector2(){
   lcd.setCursor(0, 0);
-  lcd.print("  Spray Count   ");
+  lcd.print(analogRead(lightSensor));
+  //lcd.print("  Spray Count   ");
   
   lcd.setCursor(0, 1);
   lcd.print("Reset       Next");
@@ -480,7 +490,8 @@ void printMenuSelector2(){
 // Function that prints settings selector 3 to the lcd
 void printMenuSelector3(){
   lcd.setCursor(0, 0);
-  lcd.print("      Quit      ");
+  lcd.print(lastMotion);
+  //lcd.print("      Quit      ");
 
   lcd.setCursor(0, 1);
   lcd.print("Confirm     Next");
@@ -493,10 +504,10 @@ void printDelaySelector(){
     case -1:
       switch (currentSprayDelay){
         case 0:
-          lcd.print("Delay is now 1s ");
+          lcd.print("Delay is now 15s ");
           break;
         case 1:
-          lcd.print("Delay is now 10s");
+          lcd.print("Delay is now 30s");
           break;
         case 2:
           lcd.print("Delay is now 1m ");
