@@ -49,6 +49,8 @@ unsigned long sprayScheduled = 0;
 
 const int motionPin = 7;
 unsigned long lastMotion = 0;
+unsigned long motionStartedCalibrating = 0;
+bool motionDoneCalibrating = false;
 
 unsigned long freshenerTurntOn = 0;
 unsigned long freshenerTurntOff = 0;
@@ -74,6 +76,7 @@ void setup() {
   pinMode(redLED, OUTPUT);
   lastRead = millis();
   lastMotion = millis();
+  motionStartedCalibrating = millis();
   digitalWrite(greenLED, HIGH);
 
   attachInterrupt(digitalPinToInterrupt(contactSensorPin), Door, CHANGE);
@@ -97,6 +100,10 @@ void loop() {
   int lastState = currentState;
   currentState = state(currentState);
   if(lastState != currentState) updateStateRGB();
+
+  if(!motionDoneCalibrating && (millis() - motionStartedCalibrating >= 60000)){
+    motionDoneCalibrating = true;
+  }
 
   //go spray on delay based on state
   sprayIfNecessary();
@@ -376,13 +383,15 @@ bool InUse()
   if (LightOn == false)
     return false;
 
-  //check if there is motion
-  if (digitalRead(motionPin) == HIGH)
-    lastMotion = millis();
+  //check if there is motion (only once motion sensor is done calibrating)
+  if (motionDoneCalibrating){
+    if (digitalRead(motionPin) == HIGH)
+      lastMotion = millis();
+  }
   
   //if there has been no motion for a few seconds its empty
   if (millis() - lastMotion < 5000)
-      return false;
+    return false;
 
   //also check distance??
 
@@ -400,7 +409,7 @@ bool LightOn()
 
 bool SitDown()
 {
-  if (sonar.ping_cm() < 300)
+  if (sonar.ping_cm() < 150)
     return true;
   return false;
 }
