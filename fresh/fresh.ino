@@ -31,6 +31,7 @@ int lastSavedSprayCount = 2400;
 int sprayCount = 2400;
 int sprayCountAddress = 0;
 int temp = 0;
+unsigned long lastPolledTemp = 0;
 
 const int freshenerPin = 6;
 
@@ -99,7 +100,8 @@ void loop() {
 
   //go spray on delay based on state
   sprayIfNecessary();
-  reattachPowerButtonInterruptIfNecessary();  
+  reattachPowerButtonInterruptIfNecessary();
+  pollTempIfNecessary();
 }
 
 void spray(){
@@ -119,6 +121,15 @@ void reattachPowerButtonInterruptIfNecessary() {
     attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, FALLING);
     powerButtonInterruptAttached = true;
   } 
+}
+
+void pollTempIfNecessary(){
+  if(millis() - lastPolledTemp >= 5000){
+    temperature.requestTemperatures();
+    temp = temperature.getTempCByIndex(0);
+    lastPolledTemp = millis();
+    printMenu();
+  }
 }
 
 // 0; In Use - Type Unknown:  CYAN
@@ -456,9 +467,7 @@ void printMain(){
   lcd.print(sprayCount);
   lcd.print(" sprays   ");
   lcd.setCursor(13, 0);
-
-  temperature.requestTemperatures();
-  temp = temperature.getTempCByIndex(0);
+  
   lcd.print(temp);
   lcd.print("C");
 
