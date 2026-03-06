@@ -69,27 +69,33 @@ void setup() {
   pinMode(lightSensor, INPUT);
   pinMode(motionPin, INPUT);
 
+  // sets up pins for input and output
   pinMode(buttonLadderPin, INPUT_PULLUP);
   pinMode(contactSensorPin, INPUT_PULLUP);
   pinMode(freshenerPin, OUTPUT);
   pinMode(greenLED, OUTPUT);
   pinMode(redLED, OUTPUT);
+
+  // ensures time stamps make sense
   lastRead = millis();
   lastMotion = millis();
   motionStartedCalibrating = millis();
+
+  // sets green LED on to signal it is powered
   digitalWrite(greenLED, HIGH);
 
+  // attaches interrupts to contact sensor and power button
   attachInterrupt(digitalPinToInterrupt(contactSensorPin), Door, CHANGE);
   attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, FALLING);
 
-  //Uncomment these lines **once** so the EEPROM gets set up properly, else it will (sometimes) not function
+  //Uncomment these lines **once** so the EEPROM gets set up properly, else there is no guarantee that it will function
   //EEPROM.put(sprayCountAddress, sprayCount);
   //EEPROM.put(currentDelayAddress, currentSprayDelay);
   EEPROM.get(sprayCountAddress, sprayCount);
   EEPROM.get(currentDelayAddress, currentSprayDelay);
   lastSavedSprayCount = sprayCount;
 
-  // Print a message to the LCD.
+  // Prints the home screen
   printMenu();
 }
 
@@ -97,15 +103,17 @@ void loop() {
 
   readButtons();
 
+  //if the state changes, the LEDs will reflect this
   int lastState = currentState;
   currentState = state(currentState);
   if(lastState != currentState) updateStateRGB();
 
+  //ensures motion sensor is done calibrating before asking for data
   if(!motionDoneCalibrating && (millis() - motionStartedCalibrating >= 60000)){
     motionDoneCalibrating = true;
   }
 
-  //go spray on delay based on state
+  //queues a spray on delay based on state
   sprayIfNecessary();
   reattachPowerButtonInterruptIfNecessary();
   pollTempIfNecessary();
@@ -114,7 +122,7 @@ void loop() {
 void spray(){
   //save millis() so can be undone after 16000ms
   if(millis() - freshenerTurntOff >= 1000){
-    freshenerTurntOn = millis()
+    freshenerTurntOn = millis();
     digitalWrite(freshenerPin, HIGH);
     waitingForSpray = true;
     spraysExpected -= 1;
@@ -123,6 +131,7 @@ void spray(){
   }
 }
 
+//after a delay of 250ms the power button is available for pressing again
 void reattachPowerButtonInterruptIfNecessary() {
   if((!powerButtonInterruptAttached) && millis() - lastPowerButtonPress > 250) {
     attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, FALLING);
@@ -130,6 +139,7 @@ void reattachPowerButtonInterruptIfNecessary() {
   } 
 }
 
+//if temperature hasnt been measures in 5 seconds, it refreshes and reprints the menu
 void pollTempIfNecessary(){
   if(millis() - lastPolledTemp >= 5000){
     temperature.requestTemperatures();
@@ -165,14 +175,18 @@ void updateStateRGB() {
 }
 
 void sprayIfNecessary(){
-  if((menu == 0) && (spraysExpected > 0) && (millis() - sprayScheduled + 15000 >= currentSprayDelay())){
+  //if on home screen, and there are sprays expected, it sets up the freshener to spray (if not already waiting for one)
+  if((!waitingForSpray) && (menu == 0) && (spraysExpected > 0) && (millis() - sprayScheduled + 15000 >= currentSprayDelayms())){
     spray();
   }
+
+  //if the freshener has been on for more than 15 seconds (with leeway), it registers that a spray has actually happened, turning the freshener off, freeing it up for another spray, and saving the actual spray coutn to EEPROM
   if(waitingForSpray && (millis() - freshenerTurntOn >= 16000)){
     waitingForSpray = false;
     EEPROM.put(sprayCountAddress, lastSavedSprayCount - 1);
     digitalWrite(freshenerPin, LOW);
     freshenerTurntOff = millis();
+    sprayScheduled = freshenerTurntOff;
   }
 }
 
@@ -353,14 +367,16 @@ int state(int prevState){
   //decide weather the person has been pooping or peeing
   if (doorOpen && doorBeenClosed == true)
   {
-    if (satDown == false || toiletPaperUsed <= 4000)
+    if (satDown == false || toiletPaperUsed <= 4000) {
       sprayScheduled = millis();
       spraysExpected += 1;
       return 1;
-    else
+    }
+    else {
       sprayScheduled = millis();
       spraysExpected += 2;
       return 2;
+    }
   }
 
   return prevState;
@@ -424,7 +440,7 @@ void Door(){
 }
 
 // Function that returns the current spray delay in ms
-int currentSprayDelay(){
+int currentSprayDelayms(){
   switch(currentSprayDelay){
     case 0:
       return 15000;
