@@ -196,16 +196,13 @@ void readButtons(){
   }
 }
 
-// Function that takes resistor ladder value and returns which button is pressed (1 - 3 for buttons, 4 for magnetic contact sensor, 0 for garbage values)
+// Function that takes resistor ladder value and returns which button is pressed (1 - 2 for buttons 1 and 2. 0 is reserved for noise values)
 int isButton(int x){
   if (x < 80){
     return 1;
   }
   else if (x < 275){
     return 2;
-  }
-  else if (x < 400){
-    return 3;
   }
   else return 0;
 }
