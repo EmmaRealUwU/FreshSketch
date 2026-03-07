@@ -406,8 +406,6 @@ bool InUse()
     if (digitalRead(motionPin) == HIGH)
       lastMotion = millis();
   }
-  
-  distance = sonar.ping_cm();
   //also check distance??
   
   //if there has been no motion for a few seconds its empty
@@ -504,10 +502,7 @@ void printMain(){
 // Function that prints settings selector 1 to the lcd
 void printMenuSelector1(){
   lcd.setCursor(0, 0);
-  lcd.print("Dist: ");
-  lcd.print(distance);
-  lcd.print("    ");
-  //lcd.print("     Delay      ");
+  lcd.print("     Delay      ");
 
   lcd.setCursor(0, 1);
   lcd.print("Edit        Next");
@@ -516,10 +511,7 @@ void printMenuSelector1(){
 // Function that prints settings selector 2 to the lcd
 void printMenuSelector2(){
   lcd.setCursor(0, 0);
-  lcd.print("Light: ");
-  lcd.print(analogRead(lightSensor));
-  lcd.print("    ");
-  //lcd.print("  Spray Count   ");
+  lcd.print("  Spray Count   ");
   
   lcd.setCursor(0, 1);
   lcd.print("Reset       Next");
@@ -528,10 +520,7 @@ void printMenuSelector2(){
 // Function that prints settings selector 3 to the lcd
 void printMenuSelector3(){
   lcd.setCursor(0, 0);
-  lcd.print("Motion: ");
-  lcd.print(lastMotion);
-  lcd.print("    ");
-  //lcd.print("      Quit      ");
+  lcd.print("      Quit      ");
 
   lcd.setCursor(0, 1);
   lcd.print("Confirm     Next");
