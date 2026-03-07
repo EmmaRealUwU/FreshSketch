@@ -417,14 +417,14 @@ bool InUse()
 bool LightOn()
 {
   int l = analogRead(lightSensor);
-  if (l < 300)
+  if (l > 4)
     return false;
   return true;
 }
 
 bool SitDown()
 {
-  if  (sonar.ping_cm() < 150)
+  if  (sonar.ping_cm() < 70)
     return true;
   return false;
 }
@@ -432,7 +432,7 @@ bool SitDown()
 bool ToiletPaperTaken()
 {
   int l = analogRead(lightSensor);
-  if (l < 500)
+  if (l < 10)
     return true;
   return false;
 }
