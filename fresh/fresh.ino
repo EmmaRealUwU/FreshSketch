@@ -87,7 +87,7 @@ void setup() {
 
   // attaches interrupts to contact sensor and power button
   attachInterrupt(digitalPinToInterrupt(contactSensorPin), Door, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, RISING);
+  attachInterrupt(digitalPinToInterrupt(powerButtonPin), buttonPress3, RISING);
 
   //Uncomment these lines **once** so the EEPROM gets set up properly, else there is no guarantee that it will function
   //EEPROM.put(sprayCountAddress, sprayCount);
@@ -136,9 +136,8 @@ void spray(){
 //after a delay of 250ms the power button is available for pressing again
 void reattachPowerButtonInterruptIfNecessary() {
   if((!powerButtonInterruptAttached) && (millis() - lastPowerButtonPress > 500)) {
-    attachInterrupt(digitalPinToInterrupt(powerButtonPin), debouncedPowerButton, RISING);
+    attachInterrupt(digitalPinToInterrupt(powerButtonPin), buttonPress3, RISING);
     powerButtonInterruptAttached = true;
-    lastPowerButtonPress = millis();
   } 
 }
 
@@ -306,20 +305,14 @@ void buttonPress3() {
     menu = 0;
     sprayScheduled = millis();
     currentState = 4;
-    updateStateRGB();
-    printMenu();
   }
   else {
     digitalWrite(greenLED, LOW);
     poweredOff = true;
     menu = -1;
-    updateStateRGB();
-    printMenu();
   }
-}
-
-void debouncedPowerButton() {
-  buttonPress3();
+  updateStateRGB();
+  printMenu();
   lastPowerButtonPress = millis();
   detachInterrupt(digitalPinToInterrupt(powerButtonPin));
   powerButtonInterruptAttached = false;
@@ -327,7 +320,8 @@ void debouncedPowerButton() {
 
 bool doorBeenClosed = false;
 bool satDown = false;
-int toiletPaperUsed = 0;
+int timesToiletPaperUsed = 0;
+bool paperBeingTaken = false;
 
 // Function that returns state:
 // 0; In Use - Type Unknown
@@ -341,7 +335,7 @@ int state(int prevState){
   }
   else if (prevState == 4){//if the use *just* started
     resetStateValues();
-    return 0; //since the loop repeats in less than a second, we dont have to start measuring inmediately
+    return 0; //since the loop repeats in less than a second, we dont have to start measuring immediately
   }
   else if (prevState != 0) //if a state has already been decided, just return that state
     return prevState;
@@ -356,10 +350,12 @@ int state(int prevState){
       satDown == true;
     }
 
-    if (ToiletPaperTaken())
-    {
-      //adjust values based on timing and lightuse and stuff???
-      toiletPaperUsed += 1;
+    //if paper is being taken, update value 
+    if (ToiletPaperTaken()) paperBeingTaken = true;
+    //if paper was taken, but no longer, update values
+    if (paperBeingTaken && !ToiletPaperTaken()) {
+      paperBeingTaken = false;
+      timesToiletPaperUsed
     }
   }
   //if the door has not been closed yet, and the restroom  has been in use for longer than a minute
@@ -372,7 +368,7 @@ int state(int prevState){
   //decide weather the person has been pooping or peeing
   if (doorOpen && doorBeenClosed == true)
   {
-    if (satDown == false || toiletPaperUsed <= 4000) {
+    if (satDown == false || timesToiletPaperUsed <= 2) {
       sprayScheduled = millis();
       spraysExpected += 1;
       return 1;
@@ -387,56 +383,70 @@ int state(int prevState){
   return prevState;
 }
 
+//help function that resets the values used to determine state
 void resetStateValues()
 {
   startUse = millis(); 
   doorBeenClosed = false;
   satDown = false;
-  toiletPaperUsed = 0;
+  timesToiletPaperUsed = 0;
 }
 
+// global bool that can be called to check for bathroom activity
 bool InUse()
 {
+  //locked door mystery resolved
+  if (!doorOpen) return true;
+
   //if the light is off, we dont need to check for anything else
   if (LightOn == false)
     return false;
 
   //check if there is motion (only once motion sensor is done calibrating)
-  if (motionDoneCalibrating){
-    if (digitalRead(motionPin) == HIGH)
-      lastMotion = millis();
+  if (motionDoneCalibrating) {
+    if(digitalRead(motionPin) == HIGH) lastMotion = millis();
   }
-  //also check distance??
   
-  //if there has been no motion for a few seconds its empty
-  if (millis() - lastMotion < 5000) return false;
+  //also check the distance sensor
+  if (SitDown()) return true;
+  
+  //if there has been no motion for a few seconds it can be presumed to be empty
+  if (millis() - lastMotion < 15000) return false;
 
-  else return true;
+  //if the lights are on, but the door is open, with no motion in the last 15 seconds and no one sat on the toilet, it seems safe to assume the toilet is not currently in use.
+  else return false;
 }
 
+//help function that checks if the lights are on currently
 bool LightOn()
 {
+  //if there is more light in the room than just from the two LEDs, the lights are on.
   int l = analogRead(lightSensor);
   if (l > 4)
     return false;
   return true;
 }
 
-bool SitDown()
-{
-  if  (sonar.ping_cm() < 70)
-    return true;
-  return false;
-}
-
+//help function that checks if paper is currently being taken
 bool ToiletPaperTaken()
 {
+  //if there is less light than there is by default when the lights are on, the sight lines between the sensor and light above are blocked by either a hand taking toilet paper, or the toilet paper being taken
   int l = analogRead(lightSensor);
   if (l < 10)
     return true;
   return false;
 }
 
+//help function that checks if someone is sat on the toilet
+bool SitDown()
+{
+  //the distance from the sonar to the wall is roughly 75cm, so when there is anything other than the wall, there is a person
+  if  (sonar.ping_cm() < 70)
+    return true;
+  return false;
+}
+
+//when the interrupt for the magnetic contact sensor is triggered, the door goes from open to closed, or from closed to open
 void Door(){
   doorOpen = !doorOpen;
 }
